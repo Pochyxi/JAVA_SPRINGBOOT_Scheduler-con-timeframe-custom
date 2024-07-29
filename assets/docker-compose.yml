@@ -1,0 +1,50 @@
+# Nome del progetto Docker Compose
+name: scheduler
+# Definizione delle reti Docker
+networks:
+  ntpgsql_scheduler:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/16  # Subnet modificata
+# Definizione dei servizi (container)
+services:
+  # Servizio PostgreSQL
+  pgsql_scheduler:
+    image: postgres:latest
+    restart: unless-stopped
+    container_name: postgresql_scheduler
+    volumes:
+      - psdb-volume-scheduler:/var/lib/postgresql/data
+    networks:
+      ntpgsql_scheduler:
+        ipv4_address: 172.30.0.2  # IP aggiornato
+    ports:
+      - "5444:5432"  # Mantenuta la porta originale
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123_Adiener}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # Servizio pgAdmin
+  pgadmin_scheduler:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    container_name: pgadmin4_scheduler
+    networks:
+      ntpgsql_scheduler:
+        ipv4_address: 172.30.0.3  # IP aggiornato
+    ports:
+      - "8088:80"  # Mantenuta la porta alternativa
+    environment:
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-adienerlopez@gmail.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-123_Adiener}
+    depends_on:
+      - pgsql_scheduler
+# Definizione dei volumi per la persistenza dei dati
+volumes:
+  psdb-volume-scheduler:
