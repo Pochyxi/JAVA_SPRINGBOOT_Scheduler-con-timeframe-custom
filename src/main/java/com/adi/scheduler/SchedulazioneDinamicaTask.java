@@ -47,7 +47,6 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
     @Override
     public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
         registrarRef.set(taskRegistrar);
-        // Qui puoi inizializzare task di default se necessario
     }
 
     /**
@@ -63,6 +62,8 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
         }
 
         long fixedRate = estraiRateo(nomeConfigurazione);
+
+        aggiornaSchedulerStart( nomeConfigurazione, fixedRate);
 
         if (fixedRate == -1L) {
             System.out.println("Il task '" + nomeConfigurazione + "' non è stato trovato.");
@@ -99,16 +100,6 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
 
         long rateoConfigurato = estraiRateo(nomeConfigurazione);
 
-        // Aggiorna la configurazione nel database
-        ConfigurazioneScheduler configurazioneScheduler =
-                configuratoreSchedulerService.getConfigurazioneScheduler(nomeConfigurazione).orElse(null);
-
-        if (configurazioneScheduler != null) {
-            configurazioneScheduler.setFixedRate(rateoConfigurato);
-            configurazioneScheduler.setInEsecuzione(true);
-            configuratoreSchedulerService.salva(configurazioneScheduler);
-        }
-
         if (rateoConfigurato == -1L) {
             System.out.println("Il task '" + nomeConfigurazione + "' non è stato trovato.");
             return;
@@ -131,21 +122,12 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
      * @param rate Nuovo rate per il task
      */
     public void aggiornaSchedulerImmediatamente(String nomeConfigurazione, long rate) {
+        aggiornaSchedulerStart( nomeConfigurazione, rate);
+
         TaskInfo taskInfo = taskMap.computeIfAbsent(nomeConfigurazione, k -> new TaskInfo());
         if (!taskInfo.isRunning.get()) {
-            System.out.println("Il task '" + nomeConfigurazione + "' è stato fermato. Usa /start/nome_task per " +
-                    "riavviarlo.");
+            riavviaTask( nomeConfigurazione );
             return;
-        }
-
-        // Aggiorna la configurazione nel database
-        ConfigurazioneScheduler configurazioneScheduler =
-                configuratoreSchedulerService.getConfigurazioneScheduler(nomeConfigurazione).orElse(null);
-
-        if (configurazioneScheduler != null) {
-            configurazioneScheduler.setFixedRate(rate);
-            configurazioneScheduler.setInEsecuzione(true);
-            configuratoreSchedulerService.salva(configurazioneScheduler);
         }
 
         long nuovoRate = estraiRateo(nomeConfigurazione);
@@ -187,12 +169,7 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
      * @param nomeConfigurazione Nome del task da fermare
      */
     public void stoppaTask(String nomeConfigurazione) {
-        ConfigurazioneScheduler configurazioneScheduler = configuratoreSchedulerService.getConfigurazioneScheduler(nomeConfigurazione).orElse(null);
-
-        if (configurazioneScheduler != null) {
-            configurazioneScheduler.setInEsecuzione(false);
-            configuratoreSchedulerService.salva(configurazioneScheduler);
-        }
+        aggiornaSchedulerStop( nomeConfigurazione );
 
         TaskInfo taskInfo = taskMap.get(nomeConfigurazione);
         if (taskInfo != null) {
@@ -235,5 +212,26 @@ public class SchedulazioneDinamicaTask implements SchedulingConfigurer {
         final AtomicReference<ScheduledFuture<?>> futureRef = new AtomicReference<>();
         final AtomicLong currentRateRef = new AtomicLong(DEFAULT_RATE);
         final AtomicBoolean isRunning = new AtomicBoolean(true);
+    }
+
+    private void aggiornaSchedulerStart(String nomeConfigurazione, long rate) {
+        // Aggiorna la configurazione nel database
+        ConfigurazioneScheduler configurazioneScheduler =
+                configuratoreSchedulerService.getConfigurazioneScheduler(nomeConfigurazione).orElse(null);
+
+        if (configurazioneScheduler != null) {
+            configurazioneScheduler.setFixedRate(rate);
+            configurazioneScheduler.setInEsecuzione(true);
+            configuratoreSchedulerService.salva(configurazioneScheduler);
+        }
+    }
+
+    private void aggiornaSchedulerStop(String nomeConfigurazione) {
+        ConfigurazioneScheduler configurazioneScheduler = configuratoreSchedulerService.getConfigurazioneScheduler(nomeConfigurazione).orElse(null);
+
+        if (configurazioneScheduler != null) {
+            configurazioneScheduler.setInEsecuzione(false);
+            configuratoreSchedulerService.salva(configurazioneScheduler);
+        }
     }
 }
